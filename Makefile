@@ -1,7 +1,7 @@
 # This makefile was automatically generated. Run ./generate_make_file to regenerate the file.
 CC=g++
 AR=ar
-CFLAGS=-Wall -DNDEBUG -march=native -ffast-math -std=c++11 -O3 -fPIC -Iinclude
+CFLAGS=-Wall -DNDEBUG -march=native -ffast-math -std=c++11 -O3 -DROUTING_KIT_NO_ALIGNED_ALLOC -fPIC -Iinclude
 LDFLAGS=
 OMP_CFLAGS=-fopenmp
 OMP_LDFLAGS=-fopenmp

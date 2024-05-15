@@ -34,18 +34,16 @@ double stop_timer()
 }
 
 int main(int argc, char** argv){
-    if (argc != 7) {
-        // std::cout << "Usage: " << argv[0] << " first_out head order metric cores" << std::endl;
-        std::cout << "Usage: " << argv[0] << " first_out head latitude longtitude metric cores" << std::endl;
+    if (argc != 6) {
+        std::cout << "Usage: " << argv[0] << " first_out head order metric cores" << std::endl;
         return 1;
     }
 
     std::string first_out_file = argv[1];
     std::string head_file = argv[2];
-    std::string latitude_file = argv[3];
-    std::string longitude_file = argv[4];
-    std::string weight_file = argv[5];
-    int cores = std::stoi(argv[6]);
+    std::string order_file = argv[3];
+    std::string weight_file = argv[4];
+    int cores = std::stoi(argv[5]);
 
     cout << "----------------------------- Start Reading the Graph -----------------------------" << endl;
     cout << endl;
@@ -53,24 +51,14 @@ int main(int argc, char** argv){
     std::vector<unsigned> first_out = RoutingKit::load_vector<unsigned>(first_out_file);
     std::vector<unsigned> tail = RoutingKit::invert_inverse_vector(first_out);
     std::vector<unsigned> head = RoutingKit::load_vector<unsigned>(head_file);
-    // std::vector<unsigned> node_order = RoutingKit::load_vector<unsigned>(order_file);
-    std::vector<float> latitude = RoutingKit::load_vector<float>(latitude_file);
-    std::vector<float> longitude = RoutingKit::load_vector<float>(longitude_file);
+    std::vector<unsigned> node_order = RoutingKit::load_vector<unsigned>(order_file);
     std::vector<unsigned> weight = RoutingKit::load_vector<unsigned>(weight_file);
     unsigned node_count = first_out.size()-1;
-    // std::cout << "read input " << first_out.size() << " " << tail.size() << " " << head.size() << " " << node_order.size() << " " << weight.size() << std::endl;
-    std::cout << "read input " << first_out.size() << " " << tail.size() << " " << head.size() << " " << latitude.size() << " " << longitude.size() << " " << weight.size() << std::endl;
+    std::cout << "read input " << first_out.size() << " " << tail.size() << " " << head.size() << " " << node_order.size() << " " << weight.size() << std::endl;
 
     cout << "----------------------------- Preproecssing -----------------------------\n" << endl;
 
-	start_timer();
-	// std::vector<unsigned>node_order = compute_nested_node_dissection_order_using_inertial_flow(node_count, tail, head, latitude, longitude, [](std::string msg){cerr << msg << endl;});
-	std::vector<unsigned>node_order = compute_nested_node_dissection_order_using_inertial_flow(node_count, tail, head, latitude, longitude);
-    
-    double order_time = stop_timer();
-    std::cout << "ordering done" << std::endl;
     start_timer();
-	// CustomizableContractionHierarchy cch(node_order, tail, head, [](std::string msg){cerr << msg << endl;});
 	CustomizableContractionHierarchy cch(node_order, tail, head);
     std::cout << "built CCH" << std::endl;
 	double CH_construct_time = stop_timer();
@@ -110,9 +98,6 @@ int main(int argc, char** argv){
 
     cout << "----------------------------- Statistics -----------------------------" << endl;
     cout << endl;
-	cout << "Order: " + to_string(order_time) + "s" << endl;
-	cout << "CH construct: " + to_string(CH_construct_time) + "s" << endl;
-    cout << "Total Preprocessing: " + to_string(order_time + CH_construct_time) + "s" << endl;
     cout << "Total customization: " + to_string(customization_time) + "s" << endl;
 	cout << n_queries << " Query Time:   " + to_string(random_query_time) + "s" << endl;
 	cout << "Average Query Time:   " + to_string(random_query_time/n_queries) + "s" << endl;
