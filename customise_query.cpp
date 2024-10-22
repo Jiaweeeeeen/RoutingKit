@@ -81,7 +81,8 @@ int main(int argc, char** argv){
     // cout << "----------------------------- Preproecssing -----------------------------\n" << endl;
 
     start_timer();
-	CustomizableContractionHierarchy cch(node_order, tail, head);
+	// CustomizableContractionHierarchy cch(node_order, tail, head);
+    CustomizableContractionHierarchy cch(node_order, tail, head, [](std::string msg){cerr << msg << endl;});
     // std::cout << "built CCH" << std::endl;
 	double CH_construct_time = stop_timer();
 

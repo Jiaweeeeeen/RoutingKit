@@ -305,7 +305,7 @@ int main(int argc, char*argv[]){
 		auto perfect_ch = m.build_contraction_hierarchy_using_perfect_witness_search();
 		
 		cout << "perfect CH has " << perfect_ch.forward.head.size() << " forward arcs " << endl;
-		cout << "perfect CH has " << perfect_ch.backward.head.size() << " backward arcs " << endl;
+		// cout << "perfect CH has " << perfect_ch.backward.head.size() << " backward arcs " << endl;
 
 		ContractionHierarchyQuery q(perfect_ch);
 		{
@@ -770,13 +770,13 @@ int main(int argc, char*argv[]){
 		parallel.customize(metric3, 4);
 		
 		EXPECT(metric1.forward == metric4.forward);
-		EXPECT(metric1.backward == metric4.backward);
+		// EXPECT(metric1.backward == metric4.backward);
 
 		EXPECT(metric2.forward == metric4.forward);
-		EXPECT(metric2.backward == metric4.backward);
+		// EXPECT(metric2.backward == metric4.backward);
 
 		EXPECT(metric3.forward == metric4.forward);
-		EXPECT(metric3.backward == metric4.backward);
+		// EXPECT(metric3.backward == metric4.backward);
 	}
 
 	return expect_failed;

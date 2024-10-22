@@ -52,16 +52,16 @@ struct CustomizableContractionHierarchy{
 	LocalIDMapper does_cch_arc_have_input_arc_mapper;
 
 	std::vector<unsigned>forward_input_arc_of_cch;
-	std::vector<unsigned>backward_input_arc_of_cch;
+	// std::vector<unsigned>backward_input_arc_of_cch;
 
 	BitVector does_cch_arc_have_extra_input_arc;
 	LocalIDMapper does_cch_arc_have_extra_input_arc_mapper;
 
 	std::vector<unsigned>first_extra_forward_input_arc_of_cch;
-	std::vector<unsigned>first_extra_backward_input_arc_of_cch;
+	// std::vector<unsigned>first_extra_backward_input_arc_of_cch;
 	
 	std::vector<unsigned>extra_forward_input_arc_of_cch;
-	std::vector<unsigned>extra_backward_input_arc_of_cch;
+	// std::vector<unsigned>extra_backward_input_arc_of_cch;
 };
 
 struct CustomizableContractionHierarchyMetric{
@@ -81,7 +81,7 @@ struct CustomizableContractionHierarchyMetric{
 
 // private:
 	std::vector<unsigned>forward;
-	std::vector<unsigned>backward;
+	// std::vector<unsigned>backward;
 	const CustomizableContractionHierarchy*cch;
 	const unsigned*input_weight;
 
