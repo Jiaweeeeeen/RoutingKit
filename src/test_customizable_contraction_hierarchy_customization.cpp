@@ -80,17 +80,19 @@ int main(int argc, char*argv[]){
 		timer += get_micro_time();
 		cout << "done [" << timer << "musec]" << endl;
 
-		// if(reference_metric.forward != parallel_metric.forward || reference_metric.backward != parallel_metric.backward){
-		// 	throw std::runtime_error("Parallel Customization is broken");
-		// }else{
-		// 	cout << "Parallel Customization is ok" << endl;
-		// }
-
-		if(reference_metric.forward != parallel_metric.forward){
+        #ifdef UNDIRECTED
+		if(reference_metric.weight != parallel_metric.weight){
 			throw std::runtime_error("Parallel Customization is broken");
 		}else{
 			cout << "Parallel Customization is ok" << endl;
 		}
+		#else
+		if(reference_metric.forward != parallel_metric.forward || reference_metric.backward != parallel_metric.backward){
+			throw std::runtime_error("Parallel Customization is broken");
+		}else{
+			cout << "Parallel Customization is ok" << endl;
+		}
+		#endif
 		#endif
 
 		CustomizableContractionHierarchyMetric partial_metric = reference_metric;
@@ -102,17 +104,20 @@ int main(int argc, char*argv[]){
 		timer += get_micro_time();
 		cout << "done [" << timer << "musec]" << endl;
 
-
-		// if(reference_metric.forward != partial_metric.forward || reference_metric.backward != partial_metric.backward){
-		// 	throw std::runtime_error("Nop Partial Customization is broken");
-		// }else{
-		// 	cout << "Nop Partial Customization is ok" << endl;
-		// }
-		if(reference_metric.forward != partial_metric.forward){
+        #ifdef UNDIRECTED
+		if(reference_metric.weight != partial_metric.weight){
 			throw std::runtime_error("Nop Partial Customization is broken");
 		}else{
 			cout << "Nop Partial Customization is ok" << endl;
 		}
+		#else
+		if(reference_metric.forward != partial_metric.forward || reference_metric.backward != partial_metric.backward){
+			throw std::runtime_error("Nop Partial Customization is broken");
+		}else{
+			cout << "Nop Partial Customization is ok" << endl;
+		}
+		#endif
+
 
 		cout << "No-Change Partial Customization ... " << flush;
 		timer = -get_micro_time();
@@ -122,16 +127,19 @@ int main(int argc, char*argv[]){
 		timer += get_micro_time();
 		cout << "done [" << timer << "musec]" << endl;
 
-		// if(reference_metric.forward != partial_metric.forward || reference_metric.backward != partial_metric.backward){
-		// 	throw std::runtime_error("No-Change Partial Customization is broken");
-		// }else{
-		// 	cout << "No-Change Partial Customization is ok" << endl;
-		// }
-		if(reference_metric.forward != partial_metric.forward){
+		#ifdef UNDIRECTED
+		if(reference_metric.weight != partial_metric.weight){
 			throw std::runtime_error("No-Change Partial Customization is broken");
 		}else{
 			cout << "No-Change Partial Customization is ok" << endl;
 		}
+		#else
+		if(reference_metric.forward != partial_metric.forward || reference_metric.backward != partial_metric.backward){
+			throw std::runtime_error("No-Change Partial Customization is broken");
+		}else{
+			cout << "No-Change Partial Customization is ok" << endl;
+		}
+		#endif
 
 		cout << "Partial Customization ... " << flush;
 		timer = -get_micro_time();
@@ -146,13 +154,17 @@ int main(int argc, char*argv[]){
 
 		reference_metric.customize();
 
-		for(unsigned a = 0; a < reference_metric.forward.size(); ++a){
-			if(reference_metric.forward[a] != partial_metric.forward[a])
-				throw std::runtime_error("Partial Customization is broken: forward weight of "+std::to_string(a)+" is "+std::to_string(partial_metric.forward[a]) + " but should be "+std::to_string(reference_metric.forward[a]));
-			// if(reference_metric.backward[a] != partial_metric.backward[a])
-			// 	throw std::runtime_error("Partial Customization is broken: backward weight of "+std::to_string(a)+" is "+std::to_string(partial_metric.forward[a]) + " but should be "+std::to_string(reference_metric.forward[a]));
-
+		#ifdef UNDIRECTED
+		for(unsigned a = 0; a < reference_metric.weight.size(); ++a){
+			if(reference_metric.weight[a] != partial_metric.weight[a])
+				throw std::runtime_error("Partial Customization is broken: forward weight of "+std::to_string(a)+" is "+std::to_string(partial_metric.weight[a]) + " but should be "+std::to_string(reference_metric.weight[a]));
 		}
+		#else
+		for(unsigned a = 0; a < reference_metric.forward.size(); ++a){
+			if(reference_metric.backward[a] != partial_metric.backward[a])
+				throw std::runtime_error("Partial Customization is broken: backward weight of "+std::to_string(a)+" is "+std::to_string(partial_metric.forward[a]) + " but should be "+std::to_string(reference_metric.forward[a]));
+		}
+		#endif
 		cout << "Partial Customization is ok" << endl;
 
 	}catch(exception&err){
