@@ -563,11 +563,17 @@ CustomizableContractionHierarchy::CustomizableContractionHierarchy(
 
 		does_cch_arc_have_input_arc_mapper = LocalIDMapper(does_cch_arc_have_input_arc);
 
+		#ifdef UNDIRECTED
+        input_arc_of_cch.resize(does_cch_arc_have_input_arc_mapper.local_id_count());
+		std::fill(input_arc_of_cch.begin(), input_arc_of_cch.end(), invalid_id);
+
+		#else
 		forward_input_arc_of_cch.resize(does_cch_arc_have_input_arc_mapper.local_id_count());
-		// backward_input_arc_of_cch.resize(does_cch_arc_have_input_arc_mapper.local_id_count());
+		backward_input_arc_of_cch.resize(does_cch_arc_have_input_arc_mapper.local_id_count());
 
 		std::fill(forward_input_arc_of_cch.begin(), forward_input_arc_of_cch.end(), invalid_id);
-		// std::fill(backward_input_arc_of_cch.begin(), backward_input_arc_of_cch.end(), invalid_id);
+		std::fill(backward_input_arc_of_cch.begin(), backward_input_arc_of_cch.end(), invalid_id);
+		#endif
 
 		does_cch_arc_have_extra_input_arc.resize(cch_arc_count, BitVector::uninitialized);
 		does_cch_arc_have_extra_input_arc.reset_all();
@@ -576,6 +582,18 @@ CustomizableContractionHierarchy::CustomizableContractionHierarchy(
 			unsigned cch_arc = input_arc_to_cch_arc[input_arc];
 			if(cch_arc != invalid_id){
 				unsigned i = does_cch_arc_have_input_arc_mapper.to_local(cch_arc);
+				#ifdef UNDIRECTED
+				if(is_input_arc_upward.is_set(input_arc)){
+					if(input_arc_of_cch[i] == invalid_id){
+						input_arc_of_cch[i] = input_arc;
+					}else{
+						does_cch_arc_have_extra_input_arc.set(cch_arc);
+
+						first_extra_input_arc_of_cch.push_back(cch_arc);
+						extra_input_arc_of_cch.push_back(input_arc);
+					}
+				}
+				#else
 				if(is_input_arc_upward.is_set(input_arc)){
 					if(forward_input_arc_of_cch[i] == invalid_id){
 						forward_input_arc_of_cch[i] = input_arc;
@@ -586,25 +604,43 @@ CustomizableContractionHierarchy::CustomizableContractionHierarchy(
 						extra_forward_input_arc_of_cch.push_back(input_arc);
 					}
 				}else{
-					// if(backward_input_arc_of_cch[i] == invalid_id){
-					// 	backward_input_arc_of_cch[i] = input_arc;
-					// }else{
-					// 	does_cch_arc_have_extra_input_arc.set(cch_arc);
+					if(backward_input_arc_of_cch[i] == invalid_id){
+						backward_input_arc_of_cch[i] = input_arc;
+					}else{
+						does_cch_arc_have_extra_input_arc.set(cch_arc);
 
-					// 	first_extra_backward_input_arc_of_cch.push_back(cch_arc);
-					// 	extra_backward_input_arc_of_cch.push_back(input_arc);
-					// }
+						first_extra_backward_input_arc_of_cch.push_back(cch_arc);
+						extra_backward_input_arc_of_cch.push_back(input_arc);
+					}
 				}
+				#endif
 			}
 		}
 
 		does_cch_arc_have_extra_input_arc_mapper = LocalIDMapper(does_cch_arc_have_extra_input_arc);
-
+        
+		#ifdef UNDIRECTED
+		for(auto&x:first_extra_input_arc_of_cch)
+			x = does_cch_arc_have_extra_input_arc_mapper.to_local(x);
+		{
+			auto p = compute_inverse_stable_sort_permutation_using_key(
+				first_extra_input_arc_of_cch,
+				does_cch_arc_have_extra_input_arc_mapper.local_id_count(),
+				[](unsigned x){return x;}
+			);
+			first_extra_input_arc_of_cch =
+				invert_vector(
+					apply_inverse_permutation(p, std::move(first_extra_input_arc_of_cch)),
+					does_cch_arc_have_extra_input_arc_mapper.local_id_count()
+				)
+			;
+			extra_input_arc_of_cch = apply_inverse_permutation(p, std::move(extra_input_arc_of_cch));
+		}
+		#else
 		for(auto&x:first_extra_forward_input_arc_of_cch)
 			x = does_cch_arc_have_extra_input_arc_mapper.to_local(x);
-		// for(auto&x:first_extra_backward_input_arc_of_cch)
-		// 	x = does_cch_arc_have_extra_input_arc_mapper.to_local(x);
-
+		for(auto&x:first_extra_backward_input_arc_of_cch)
+			x = does_cch_arc_have_extra_input_arc_mapper.to_local(x);
 		{
 			auto p = compute_inverse_stable_sort_permutation_using_key(
 				first_extra_forward_input_arc_of_cch,
@@ -620,22 +656,21 @@ CustomizableContractionHierarchy::CustomizableContractionHierarchy(
 			extra_forward_input_arc_of_cch = apply_inverse_permutation(p, std::move(extra_forward_input_arc_of_cch));
 		}
 
-
-		// {
-		// 	auto p = compute_inverse_stable_sort_permutation_using_key(
-		// 		first_extra_backward_input_arc_of_cch,
-		// 		does_cch_arc_have_extra_input_arc_mapper.local_id_count(),
-		// 		[](unsigned x){return x;}
-		// 	);
-		// 	first_extra_backward_input_arc_of_cch =
-		// 		invert_vector(
-		// 			apply_inverse_permutation(p, std::move(first_extra_backward_input_arc_of_cch)),
-		// 			does_cch_arc_have_extra_input_arc_mapper.local_id_count()
-		// 		)
-		// 	;
-		// 	extra_backward_input_arc_of_cch = apply_inverse_permutation(p, std::move(extra_backward_input_arc_of_cch));
-		// }
-
+		{
+			auto p = compute_inverse_stable_sort_permutation_using_key(
+				first_extra_backward_input_arc_of_cch,
+				does_cch_arc_have_extra_input_arc_mapper.local_id_count(),
+				[](unsigned x){return x;}
+			);
+			first_extra_backward_input_arc_of_cch =
+				invert_vector(
+					apply_inverse_permutation(p, std::move(first_extra_backward_input_arc_of_cch)),
+					does_cch_arc_have_extra_input_arc_mapper.local_id_count()
+				)
+			;
+			extra_backward_input_arc_of_cch = apply_inverse_permutation(p, std::move(extra_backward_input_arc_of_cch));
+		}
+		#endif
 	}
 
 	if(log_message){
@@ -658,27 +693,44 @@ namespace{
 
 	void extract_initial_metric_of_cch_arc(const CustomizableContractionHierarchy&cch, CustomizableContractionHierarchyMetric&metric, unsigned cch_arc){
 		if(__builtin_expect(!cch.does_cch_arc_have_input_arc.is_set(cch_arc), true)){
+			#ifdef UNDIRECTED
+			metric.weight[cch_arc] = inf_weight;
+			#else
 			metric.forward[cch_arc] = inf_weight;
-			// metric.backward[cch_arc] = inf_weight;
+			metric.backward[cch_arc] = inf_weight;
+			#endif
 		} else {
 			{
 				unsigned i = cch.does_cch_arc_have_input_arc_mapper.to_local(cch_arc);
+				#ifdef UNDIRECTED
+				if(cch.input_arc_of_cch[i] != invalid_id)
+					metric.weight[cch_arc] = metric.input_weight[cch.input_arc_of_cch[i]];
+				else
+					metric.weight[cch_arc] = inf_weight;
+				#else
 				if(cch.forward_input_arc_of_cch[i] != invalid_id)
 					metric.forward[cch_arc] = metric.input_weight[cch.forward_input_arc_of_cch[i]];
 				else
 					metric.forward[cch_arc] = inf_weight;
 
-				// if(cch.backward_input_arc_of_cch[i] != invalid_id)
-				// 	metric.backward[cch_arc] = metric.input_weight[cch.backward_input_arc_of_cch[i]];
-				// else
-				// 	metric.backward[cch_arc] = inf_weight;
+				if(cch.backward_input_arc_of_cch[i] != invalid_id)
+					metric.backward[cch_arc] = metric.input_weight[cch.backward_input_arc_of_cch[i]];
+				else
+					metric.backward[cch_arc] = inf_weight;
+				#endif
+
 			}
 			if(cch.does_cch_arc_have_extra_input_arc.is_set(cch_arc)){
 				unsigned i = cch.does_cch_arc_have_extra_input_arc_mapper.to_local(cch_arc);
+				#ifdef UNDIRECTED
+				for(unsigned j=cch.first_extra_input_arc_of_cch[i]; j<cch.first_extra_input_arc_of_cch[i+1]; ++j)
+					min_to(metric.weight[cch_arc], metric.input_weight[cch.extra_input_arc_of_cch[j]]);
+				#else
 				for(unsigned j=cch.first_extra_forward_input_arc_of_cch[i]; j<cch.first_extra_forward_input_arc_of_cch[i+1]; ++j)
 					min_to(metric.forward[cch_arc], metric.input_weight[cch.extra_forward_input_arc_of_cch[j]]);
-				// for(unsigned j=cch.first_extra_backward_input_arc_of_cch[i]; j<cch.first_extra_backward_input_arc_of_cch[i+1]; ++j)
-				// 	min_to(metric.backward[cch_arc], metric.input_weight[cch.extra_backward_input_arc_of_cch[j]]);
+				for(unsigned j=cch.first_extra_backward_input_arc_of_cch[i]; j<cch.first_extra_backward_input_arc_of_cch[i+1]; ++j)
+					min_to(metric.backward[cch_arc], metric.input_weight[cch.extra_backward_input_arc_of_cch[j]]);
+			    #endif
 			}
 		}
 	}
@@ -701,9 +753,12 @@ namespace{
 			(void)bottom_node;
 			(void)mid_node;
 			(void)top_node;
-			// min_to(metric->forward[top_arc],  metric->backward[bottom_arc] + metric->forward[mid_arc] );
-			// min_to(metric->backward[top_arc], metric->forward[bottom_arc]  + metric->backward[mid_arc]);
-			min_to(metric->forward[top_arc],  metric->forward[bottom_arc] + metric->forward[mid_arc] );
+			#ifdef UNDIRECTED
+			min_to(metric->weight[top_arc],  metric->weight[bottom_arc] + metric->weight[mid_arc] );
+			#else
+			min_to(metric->forward[top_arc],  metric->backward[bottom_arc] + metric->forward[mid_arc] );
+			min_to(metric->backward[top_arc], metric->forward[bottom_arc]  + metric->backward[mid_arc]);
+			#endif
 			return true;
 		}
 
@@ -723,9 +778,12 @@ namespace{
 			(void)bottom_node;
 			(void)mid_node;
 			(void)top_node;
-			// assert(metric->forward[top_arc] <= metric->backward[bottom_arc] + metric->forward[mid_arc]);
-			// assert(metric->backward[top_arc] <= metric->forward[bottom_arc] + metric->backward[mid_arc]);
-			assert(metric->forward[top_arc] <= metric->forward[bottom_arc] + metric->forward[mid_arc]);
+			#ifdef UNDIRECTED
+			assert(metric->weight[top_arc] <= metric->weight[bottom_arc] + metric->weight[mid_arc]);
+			#else
+			assert(metric->forward[top_arc] <= metric->backward[bottom_arc] + metric->forward[mid_arc]);
+			assert(metric->backward[top_arc] <= metric->forward[bottom_arc] + metric->backward[mid_arc]);
+			#endif
 			return true;
 		}
 
@@ -734,21 +792,24 @@ namespace{
 	#endif
 }
 
-// CustomizableContractionHierarchyMetric::CustomizableContractionHierarchyMetric(const CustomizableContractionHierarchy&cch, const std::vector<unsigned>&input_weight):
-// 	forward(cch.cch_arc_count()), backward(cch.cch_arc_count()), cch(&cch), input_weight(&input_weight[0]){
-// }
-
+#ifdef UNDIRECTED
 CustomizableContractionHierarchyMetric::CustomizableContractionHierarchyMetric(const CustomizableContractionHierarchy&cch, const std::vector<unsigned>&input_weight):
-	forward(cch.cch_arc_count()), cch(&cch), input_weight(&input_weight[0]){
+	weight(cch.cch_arc_count()), cch(&cch), input_weight(&input_weight[0]){
 }
-
-// CustomizableContractionHierarchyMetric::CustomizableContractionHierarchyMetric(const CustomizableContractionHierarchy&cch, const unsigned*input_weight):
-// 	forward(cch.cch_arc_count()), backward(cch.cch_arc_count()), cch(&cch), input_weight(input_weight){
-// }
 
 CustomizableContractionHierarchyMetric::CustomizableContractionHierarchyMetric(const CustomizableContractionHierarchy&cch, const unsigned*input_weight):
-	forward(cch.cch_arc_count()), cch(&cch), input_weight(input_weight){
+	weight(cch.cch_arc_count()), cch(&cch), input_weight(input_weight){
 }
+
+#else
+CustomizableContractionHierarchyMetric::CustomizableContractionHierarchyMetric(const CustomizableContractionHierarchy&cch, const std::vector<unsigned>&input_weight):
+	forward(cch.cch_arc_count()), backward(cch.cch_arc_count()), cch(&cch), input_weight(&input_weight[0]){
+}
+
+CustomizableContractionHierarchyMetric::CustomizableContractionHierarchyMetric(const CustomizableContractionHierarchy&cch, const unsigned*input_weight):
+	forward(cch.cch_arc_count()), backward(cch.cch_arc_count()), cch(&cch), input_weight(input_weight){
+}
+#endif
 
 CustomizableContractionHierarchyMetric& CustomizableContractionHierarchyMetric::reset(const CustomizableContractionHierarchy&cch, const std::vector<unsigned>&input_weight){
 	assert(input_weight.size() == cch.input_arc_count() && "Input weight vector has the wrong size");
@@ -765,12 +826,21 @@ CustomizableContractionHierarchyMetric& CustomizableContractionHierarchyMetric::
 
 CustomizableContractionHierarchyMetric& CustomizableContractionHierarchyMetric::reset(const CustomizableContractionHierarchy&cch_, const unsigned*input_weight_){
 	assert(input_weight_ != nullptr && "Input weight pointer must not be null");
+	#ifdef UNDIRECTED
+	if(cch_.cch_arc_count() != weight.size()){
+		*this = CustomizableContractionHierarchyMetric(cch_, input_weight_);
+	}else{
+		cch = &cch_;
+		input_weight = input_weight_;
+	}
+	#else
 	if(cch_.cch_arc_count() != forward.size()){
 		*this = CustomizableContractionHierarchyMetric(cch_, input_weight_);
 	}else{
 		cch = &cch_;
 		input_weight = input_weight_;
 	}
+	#endif
 	return *this;
 }
 
@@ -834,9 +904,12 @@ namespace{
 			(void)bottom_node;
 			(void)mid_node;
 			(void)top_node;
-			// atomic_min_to(metric->forward[top_arc],  metric->backward[bottom_arc] + metric->forward[mid_arc] );
-			// atomic_min_to(metric->backward[top_arc], metric->forward[bottom_arc]  + metric->backward[mid_arc]);
-			atomic_min_to(metric->forward[top_arc],  metric->forward[bottom_arc] + metric->forward[mid_arc] );
+			#ifdef UNDIRECTED
+			atomic_min_to(metric->weight[top_arc],  metric->weight[bottom_arc] + metric->weight[mid_arc] );
+			#else
+			atomic_min_to(metric->forward[top_arc],  metric->backward[bottom_arc] + metric->forward[mid_arc] );
+			atomic_min_to(metric->backward[top_arc], metric->forward[bottom_arc]  + metric->backward[mid_arc]);
+			#endif
 			return true;
 		}
 
@@ -989,12 +1062,17 @@ CustomizableContractionHierarchyPartialCustomization&CustomizableContractionHier
 	while(!q.empty()){
 		unsigned xy = q.pop();
 
+		#ifdef UNDIRECTED
+		unsigned old_weight = metric.weight[xy];
+		metric.weight[xy] = inf_weight;
+		#else
 		unsigned old_forward = metric.forward[xy];
-		// unsigned old_backward = metric.backward[xy];
-
+		unsigned old_backward = metric.backward[xy];
+		
 		metric.forward[xy] = inf_weight;
-		// metric.backward[xy] = inf_weight;
-
+		metric.backward[xy] = inf_weight;
+		#endif
+		
 		extract_initial_metric_of_cch_arc(*cch, metric, xy);
 
 		forall_lower_triangles_of_arc(
@@ -1002,11 +1080,10 @@ CustomizableContractionHierarchyPartialCustomization&CustomizableContractionHier
 			LowerTriangleRelaxer(metric)
 		);
 
-		unsigned new_forward = metric.forward[xy];
-		// unsigned new_backward = metric.backward[xy];
+		#ifdef UNDIRECTED
+		unsigned new_weight = metric.weight[xy];
 
-		// if(old_forward != new_forward || old_backward != new_backward){
-		if(old_forward != new_forward){
+		if(old_weight != new_weight){
 			forall_intermediate_triangles_of_arc(
 				*cch, xy,
 				[&](
@@ -1015,12 +1092,8 @@ CustomizableContractionHierarchyPartialCustomization&CustomizableContractionHier
 				){
 					assert(mid_arc == xy);
 					if(
-						metric.forward[bottom_arc] + old_forward == metric.forward[top_arc] ||
-						metric.forward[bottom_arc] + new_forward == metric.forward[top_arc]
-						// metric.backward[bottom_arc] + old_forward == metric.forward[top_arc] ||
-						// metric.forward[bottom_arc] + old_backward == metric.backward[top_arc] ||
-						// metric.backward[bottom_arc] + new_forward < metric.forward[top_arc] ||
-						// metric.forward[bottom_arc] + new_backward < metric.backward[top_arc]
+						metric.weight[bottom_arc] + old_weight == metric.weight[top_arc] ||
+						metric.weight[bottom_arc] + new_weight < metric.weight[top_arc]
 					){
 						q.push(top_arc);
 					}
@@ -1035,12 +1108,8 @@ CustomizableContractionHierarchyPartialCustomization&CustomizableContractionHier
 				){
 					assert(bottom_arc == xy);
 					if(
-						metric.forward[bottom_arc] + old_forward == metric.forward[top_arc] ||
-						metric.forward[bottom_arc] + new_forward == metric.forward[top_arc]
-						// metric.forward[mid_arc] + old_backward == metric.forward[top_arc] ||
-						// metric.backward[mid_arc] + old_forward == metric.backward[top_arc] ||
-						// metric.forward[mid_arc] + new_backward < metric.forward[top_arc] ||
-						// metric.backward[mid_arc] + new_forward < metric.backward[top_arc]
+						metric.weight[bottom_arc] + old_weight == metric.weight[top_arc] ||
+						metric.weight[bottom_arc] + new_weight < metric.weight[top_arc]
 					){
 						q.push(top_arc);
 					}
@@ -1048,6 +1117,49 @@ CustomizableContractionHierarchyPartialCustomization&CustomizableContractionHier
 				}
 			);
 		}
+		#else
+		unsigned new_forward = metric.forward[xy];
+		unsigned new_backward = metric.backward[xy];
+	
+		if(old_forward != new_forward || old_backward != new_backward){
+			forall_intermediate_triangles_of_arc(
+				*cch, xy,
+				[&](
+					unsigned bottom_arc, unsigned mid_arc, unsigned top_arc,
+					unsigned bottom_node, unsigned mid_node, unsigned top_node
+				){
+					assert(mid_arc == xy);
+					if(
+						metric.backward[bottom_arc] + old_forward == metric.forward[top_arc] ||
+						metric.forward[bottom_arc] + old_backward == metric.backward[top_arc] ||
+						metric.backward[bottom_arc] + new_forward < metric.forward[top_arc] ||
+						metric.forward[bottom_arc] + new_backward < metric.backward[top_arc]
+					){
+						q.push(top_arc);
+					}
+					return true;
+				}
+			);
+			forall_upper_triangles_of_arc(
+				*cch, xy,
+				[&](
+					unsigned bottom_arc, unsigned mid_arc, unsigned top_arc,
+					unsigned bottom_node, unsigned mid_node, unsigned top_node
+				){
+					assert(bottom_arc == xy);
+					if(
+						metric.forward[mid_arc] + old_backward == metric.forward[top_arc] ||
+						metric.backward[mid_arc] + old_forward == metric.backward[top_arc] ||
+						metric.forward[mid_arc] + new_backward < metric.forward[top_arc] ||
+						metric.backward[mid_arc] + new_forward < metric.backward[top_arc]
+					){
+						q.push(top_arc);
+					}
+					return true;
+				}
+			);
+		}
+		#endif
 	}
 	#ifndef NDEBUG
 	for(unsigned a=0; a<cch->cch_arc_count(); ++a)
@@ -1242,12 +1354,19 @@ CustomizableContractionHierarchyQuery& CustomizableContractionHierarchyQuery::ru
 			cch->elimination_tree_parent,
 			source_node[i], source_elimination_tree_end[i],
 			[&](unsigned x){
-
+				#ifdef UNDIRECTED
+				relax_outgoing_arcs(
+					cch->up_first_out, cch->up_head, metric->weight,
+					forward_tentative_distance, [&](unsigned a, unsigned b){forward_predecessor_node[a] = b;},
+					x
+				);
+				#else
 				relax_outgoing_arcs(
 					cch->up_first_out, cch->up_head, metric->forward,
 					forward_tentative_distance, [&](unsigned a, unsigned b){forward_predecessor_node[a] = b;},
 					x
 				);
+				#endif
 				return true;
 			}
 		);
@@ -1263,38 +1382,24 @@ CustomizableContractionHierarchyQuery& CustomizableContractionHierarchyQuery::ru
 	shortest_path_meeting_node = invalid_id;
 	unsigned shortest_path_length = inf_weight;
 
-	// for(unsigned i = target_node.size()-1; i!=(unsigned)-1; --i){
-	// 	forall_ancestors(
-	// 		cch->elimination_tree_parent,
-	// 		target_node[i], target_elimination_tree_end[i],
-	// 		[&](unsigned x){
-	// 			relax_outgoing_arcs(
-	// 				cch->up_first_out, cch->up_head, metric->backward,
-	// 				backward_tentative_distance, [&](unsigned a, unsigned b){backward_predecessor_node[a] = b;},
-	// 				x
-	// 			);
-	// 			if(in_forward_search_space[x]){
-	// 				unsigned l = forward_tentative_distance[x] + backward_tentative_distance[x];
-	// 				if(l < shortest_path_length){
-	// 					shortest_path_length = l;
-	// 					shortest_path_meeting_node = x;
-	// 				}
-	// 			}
-	// 			return true;
-	// 		}
-	// 	);
-	// }
-
 	for(unsigned i = target_node.size()-1; i!=(unsigned)-1; --i){
 		forall_ancestors(
 			cch->elimination_tree_parent,
 			target_node[i], target_elimination_tree_end[i],
 			[&](unsigned x){
+				#ifdef UNDIRECTED
 				relax_outgoing_arcs(
-					cch->up_first_out, cch->up_head, metric->forward,
+					cch->up_first_out, cch->up_head, metric->weight,
 					backward_tentative_distance, [&](unsigned a, unsigned b){backward_predecessor_node[a] = b;},
 					x
 				);
+				#else
+				relax_outgoing_arcs(
+					cch->up_first_out, cch->up_head, metric->backward,
+					backward_tentative_distance, [&](unsigned a, unsigned b){backward_predecessor_node[a] = b;},
+					x
+				);
+				#endif
 				if(in_forward_search_space[x]){
 					unsigned l = forward_tentative_distance[x] + backward_tentative_distance[x];
 					if(l < shortest_path_length){
@@ -1399,14 +1504,14 @@ namespace{
 			(void)top_node_; (void)mid_node_;
 
 			bool fits;
-			// if(is_forward)
-			// 	fits = metric.forward[top_arc_] == metric.backward[bottom_arc_] + metric.forward[mid_arc_];
-			// else
-			// 	fits = metric.backward[top_arc_] == metric.forward[bottom_arc_] + metric.backward[mid_arc_];
+			#ifdef UNDIRECTED
+			fits = metric.weight[top_arc_] == metric.weight[bottom_arc_] + metric.weight[mid_arc_];
+			#else
 			if(is_forward)
-				fits = metric.forward[top_arc_] == metric.forward[bottom_arc_] + metric.forward[mid_arc_];
+				fits = metric.forward[top_arc_] == metric.backward[bottom_arc_] + metric.forward[mid_arc_];
 			else
-				fits = metric.forward[top_arc_] == metric.forward[bottom_arc_] + metric.forward[mid_arc_];
+				fits = metric.backward[top_arc_] == metric.forward[bottom_arc_] + metric.backward[mid_arc_];
+			#endif
 			if(fits){
 				bottom_node = bottom_node_;
 				bottom_arc = bottom_arc_;
@@ -1416,12 +1521,9 @@ namespace{
 				return true;
 			}
 		};
+		// NOTICE: check correctness
 		forall_lower_triangles_of_arc(cch, x, y, xy, unpacker);
 		if(bottom_node == invalid_id){
-			// if(is_forward)
-			// 	on_new_segment(x, xy, true);
-			// else
-			// 	on_new_segment(y, xy, false);
 			if(is_forward)
 				on_new_segment(x, xy, true);
 			else
@@ -1505,6 +1607,25 @@ namespace{
 		const CustomizableContractionHierarchy&cch, const CustomizableContractionHierarchyMetric&metric,
 		unsigned cch_arc
 	){
+		#ifdef UNDIRECTED
+		if(cch.does_cch_arc_have_input_arc.is_set(cch_arc)){
+			unsigned i = cch.does_cch_arc_have_input_arc_mapper.to_local(cch_arc);
+			if(cch.input_arc_of_cch[i] != invalid_id){
+				unsigned original_arc = cch.input_arc_of_cch[i];
+				if(metric.weight[cch_arc] == metric.input_weight[original_arc])
+					return original_arc;
+
+				if(cch.does_cch_arc_have_extra_input_arc.is_set(cch_arc)){
+					unsigned j = cch.does_cch_arc_have_extra_input_arc_mapper.to_local(cch_arc);
+					for(unsigned k = cch.first_extra_input_arc_of_cch[j]; k < cch.first_extra_input_arc_of_cch[j+1]; ++k){
+						unsigned original_arc = cch.extra_input_arc_of_cch[k];
+						if(metric.weight[cch_arc] == metric.input_weight[original_arc])
+							return original_arc;
+					}
+				}
+			}
+		}
+		#else
 		if(cch.does_cch_arc_have_input_arc.is_set(cch_arc)){
 			unsigned i = cch.does_cch_arc_have_input_arc_mapper.to_local(cch_arc);
 			if(cch.forward_input_arc_of_cch[i] != invalid_id){
@@ -1522,6 +1643,8 @@ namespace{
 				}
 			}
 		}
+		#endif
+
 		return invalid_id;
 	}
 
@@ -1529,22 +1652,41 @@ namespace{
 		const CustomizableContractionHierarchy&cch, const CustomizableContractionHierarchyMetric&metric,
 		unsigned cch_arc
 	){
-		// if(cch.does_cch_arc_have_input_arc.is_set(cch_arc)){
-		// 	unsigned i = cch.does_cch_arc_have_input_arc_mapper.to_local(cch_arc);
-		// 	if(cch.backward_input_arc_of_cch[i] != invalid_id){
-		// 		unsigned original_arc = cch.backward_input_arc_of_cch[i];
-		// 		if(metric.backward[cch_arc] == metric.input_weight[original_arc])
-		// 			return original_arc;
-		// 		if(cch.does_cch_arc_have_extra_input_arc.is_set(cch_arc)){
-		// 			unsigned j = cch.does_cch_arc_have_extra_input_arc_mapper.to_local(cch_arc);
-		// 			for(unsigned k = cch.first_extra_backward_input_arc_of_cch[j]; k < cch.first_extra_backward_input_arc_of_cch[j+1]; ++k){
-		// 				unsigned original_arc = cch.extra_backward_input_arc_of_cch[k];
-		// 				if(metric.backward[cch_arc] == metric.input_weight[original_arc])
-		// 					return original_arc;
-		// 			}
-		// 		}
-		// 	}
-		// }
+		#ifdef UNDIRECTED
+		if(cch.does_cch_arc_have_input_arc.is_set(cch_arc)){
+			unsigned i = cch.does_cch_arc_have_input_arc_mapper.to_local(cch_arc);
+			if(cch.input_arc_of_cch[i] != invalid_id){
+				unsigned original_arc = cch.input_arc_of_cch[i];
+				if(metric.weight[cch_arc] == metric.input_weight[original_arc])
+					return original_arc;
+				if(cch.does_cch_arc_have_extra_input_arc.is_set(cch_arc)){
+					unsigned j = cch.does_cch_arc_have_extra_input_arc_mapper.to_local(cch_arc);
+					for(unsigned k = cch.first_extra_input_arc_of_cch[j]; k < cch.first_extra_input_arc_of_cch[j+1]; ++k){
+						unsigned original_arc = cch.extra_input_arc_of_cch[k];
+						if(metric.weight[cch_arc] == metric.input_weight[original_arc])
+							return original_arc;
+					}
+				}
+			}
+		}
+		#else
+		if(cch.does_cch_arc_have_input_arc.is_set(cch_arc)){
+			unsigned i = cch.does_cch_arc_have_input_arc_mapper.to_local(cch_arc);
+			if(cch.backward_input_arc_of_cch[i] != invalid_id){
+				unsigned original_arc = cch.backward_input_arc_of_cch[i];
+				if(metric.backward[cch_arc] == metric.input_weight[original_arc])
+					return original_arc;
+				if(cch.does_cch_arc_have_extra_input_arc.is_set(cch_arc)){
+					unsigned j = cch.does_cch_arc_have_extra_input_arc_mapper.to_local(cch_arc);
+					for(unsigned k = cch.first_extra_backward_input_arc_of_cch[j]; k < cch.first_extra_backward_input_arc_of_cch[j+1]; ++k){
+						unsigned original_arc = cch.extra_backward_input_arc_of_cch[k];
+						if(metric.backward[cch_arc] == metric.input_weight[original_arc])
+							return original_arc;
+					}
+				}
+			}
+		}
+		#endif
 		return invalid_id;
 	}
 
@@ -1668,6 +1810,54 @@ CustomizableContractionHierarchyQuery& CustomizableContractionHierarchyQuery::re
 }
 
 namespace{
+	#ifdef UNDIRECTED
+	void internal_run_to_pinned_targets(
+		const CustomizableContractionHierarchy&cch,
+		const std::vector<unsigned>&weight,
+		std::vector<unsigned>&forward_tentative_distance, std::vector<unsigned>&backward_tentative_distance,
+		const std::vector<unsigned>&source_node, const std::vector<unsigned>&source_elimination_tree_end,
+		const std::vector<unsigned>&target_node, const std::vector<unsigned>&target_elimination_tree_end
+	){
+		for(unsigned i = source_node.size()-1; i!=(unsigned)-1; --i){
+			forall_ancestors(
+				cch.elimination_tree_parent,
+				source_node[i], source_elimination_tree_end[i],
+				[&](unsigned x){
+					relax_outgoing_arcs(
+						cch.up_first_out, cch.up_head, weight,
+						forward_tentative_distance, [](unsigned,unsigned){},
+						x
+					);
+					return true;
+				}
+			);
+		}
+
+		auto&stack = backward_tentative_distance; // backward_tentative_distance is currently not used
+		unsigned stack_end = 0;
+		for(unsigned i = target_node.size()-1; i!=(unsigned)-1; --i){
+			forall_ancestors(
+				cch.elimination_tree_parent,
+				target_node[i], target_elimination_tree_end[i],
+				[&](unsigned x){
+					stack[stack_end++] = x;
+					return true;
+				}
+			);
+		}
+
+		while(stack_end != 0){
+			--stack_end;
+			unsigned x = stack[stack_end];
+			stack[stack_end] = inf_weight;
+			relax_incoming_arcs(
+				cch.up_first_out, cch.up_head, weight,
+				forward_tentative_distance, [](unsigned,unsigned){},
+				x
+			);
+		}
+	}
+	#else
 	void internal_run_to_pinned_targets(
 		const CustomizableContractionHierarchy&cch,
 		const std::vector<unsigned>&forward_weight, const std::vector<unsigned>&backward_weight,
@@ -1714,44 +1904,52 @@ namespace{
 			);
 		}
 	}
+	#endif
 }
 
 CustomizableContractionHierarchyQuery& CustomizableContractionHierarchyQuery::run_to_pinned_targets(){
 	assert(state == query_state_target_pinned);
-	// internal_run_to_pinned_targets(
-	// 	*cch,
-	// 	metric->forward, metric->backward,
-	// 	forward_tentative_distance, backward_tentative_distance,
-	// 	source_node, source_elimination_tree_end,
-	// 	target_node, target_elimination_tree_end
-	// );
+	#ifdef UNDIRECTED
 	internal_run_to_pinned_targets(
 		*cch,
-		metric->forward, metric->forward,
+		metric->weight,
 		forward_tentative_distance, backward_tentative_distance,
 		source_node, source_elimination_tree_end,
 		target_node, target_elimination_tree_end
 	);
+	#else
+	internal_run_to_pinned_targets(
+		*cch,
+		metric->forward, metric->backward,
+		forward_tentative_distance, backward_tentative_distance,
+		source_node, source_elimination_tree_end,
+		target_node, target_elimination_tree_end
+	);
+	#endif
+
 	state = query_state_target_run;
 	return *this;
 }
 
 CustomizableContractionHierarchyQuery& CustomizableContractionHierarchyQuery::run_to_pinned_sources(){
 	assert(state == query_state_source_pinned);
-	// internal_run_to_pinned_targets(
-	// 	*cch,
-	// 	metric->backward, metric->forward,
-	// 	backward_tentative_distance, forward_tentative_distance,
-	// 	target_node, target_elimination_tree_end,
-	// 	source_node, source_elimination_tree_end
-	// );
+	#ifdef UNDIRECTED
 	internal_run_to_pinned_targets(
 		*cch,
-		metric->forward, metric->forward,
+		metric->weight,
 		backward_tentative_distance, forward_tentative_distance,
 		target_node, target_elimination_tree_end,
 		source_node, source_elimination_tree_end
 	);
+	#else
+	internal_run_to_pinned_targets(
+		*cch,
+		metric->backward, metric->forward,
+		backward_tentative_distance, forward_tentative_distance,
+		target_node, target_elimination_tree_end,
+		source_node, source_elimination_tree_end
+	);
+	#endif
 	state = query_state_source_run;
 	return *this;
 }
@@ -1784,20 +1982,27 @@ std::vector<unsigned> CustomizableContractionHierarchyQuery::get_distances_to_so
 	return v;
 }
 
+// NOTICE: This function is not working properly under undirected verson since it need to use CH
 ContractionHierarchy CustomizableContractionHierarchyMetric::build_contraction_hierarchy_using_perfect_witness_search(){
 	customize();
 
 	BitVector
 		keep_forward_arc(cch->cch_arc_count(), true),
 		keep_backward_arc(cch->cch_arc_count(), true);
-
+	
+	#ifdef UNDIRECTED
+	for(unsigned a=0; a<cch->cch_arc_count(); ++a)
+		if(weight[a] == inf_weight)
+			keep_forward_arc.reset(a);
+    #else
 	for(unsigned a=0; a<cch->cch_arc_count(); ++a)
 		if(forward[a] == inf_weight)
 			keep_forward_arc.reset(a);
 
-	// for(unsigned a=0; a<cch->cch_arc_count(); ++a)
-	// 	if(backward[a] == inf_weight)
-	// 		keep_backward_arc.reset(a);
+	for(unsigned a=0; a<cch->cch_arc_count(); ++a)
+		if(backward[a] == inf_weight)
+			keep_backward_arc.reset(a);
+	#endif
 
 	for(unsigned a=cch->cch_arc_count()-1; a!=(unsigned)-1; --a){
 		forall_upper_triangles_of_arc(
@@ -1806,30 +2011,48 @@ ContractionHierarchy CustomizableContractionHierarchyMetric::build_contraction_h
 				unsigned bottom_arc, unsigned mid_arc, unsigned top_arc,
 				unsigned bottom_node, unsigned mid_node, unsigned top_node
 			){
-				if(forward[bottom_arc] > forward[mid_arc] + forward[top_arc] ){
-					forward[bottom_arc] = forward[mid_arc] + forward[top_arc];
+				#ifdef UNDIRECTED
+				if(weight[bottom_arc] > weight[mid_arc] + weight[top_arc] ){
+					weight[bottom_arc] = weight[mid_arc] + weight[top_arc];
 					keep_forward_arc.reset(bottom_arc);
 				}
 
-				// if(forward[bottom_arc] > forward[mid_arc] + backward[top_arc] ){
-				// 	forward[bottom_arc] = forward[mid_arc] + backward[top_arc];
-				// 	keep_forward_arc.reset(bottom_arc);
-				// }
+				if(weight[bottom_arc] > weight[mid_arc] + weight[top_arc]){
+					weight[bottom_arc] = weight[mid_arc] + weight[top_arc];
+					keep_backward_arc.reset(bottom_arc);
+				}
 
-				// if(backward[bottom_arc] > backward[mid_arc] + forward[top_arc]){
-				// 	backward[bottom_arc] = backward[mid_arc] + forward[top_arc];
-				// 	keep_backward_arc.reset(bottom_arc);
-				// }
+				if(weight[mid_arc] > weight[bottom_arc] + weight[top_arc]){
+					weight[mid_arc] = weight[bottom_arc] + weight[top_arc];
+					keep_forward_arc.reset(mid_arc);
+				}
+
+				if(weight[mid_arc] > weight[bottom_arc] + weight[top_arc]){
+					weight[mid_arc] = weight[bottom_arc] + weight[top_arc];
+					keep_backward_arc.reset(mid_arc);
+				}
+				#else
+				if(forward[bottom_arc] > forward[mid_arc] + backward[top_arc] ){
+					forward[bottom_arc] = forward[mid_arc] + backward[top_arc];
+					keep_forward_arc.reset(bottom_arc);
+				}
+
+				if(backward[bottom_arc] > backward[mid_arc] + forward[top_arc]){
+					backward[bottom_arc] = backward[mid_arc] + forward[top_arc];
+					keep_backward_arc.reset(bottom_arc);
+				}
 
 				if(forward[mid_arc] > forward[bottom_arc] + forward[top_arc]){
 					forward[mid_arc] = forward[bottom_arc] + forward[top_arc];
 					keep_forward_arc.reset(mid_arc);
 				}
 
-				// if(backward[mid_arc] > backward[bottom_arc] + backward[top_arc]){
-				// 	backward[mid_arc] = backward[bottom_arc] + backward[top_arc];
-				// 	keep_backward_arc.reset(mid_arc);
-				// }
+				if(backward[mid_arc] > backward[bottom_arc] + backward[top_arc]){
+					backward[mid_arc] = backward[bottom_arc] + backward[top_arc];
+					keep_backward_arc.reset(mid_arc);
+				}
+				#endif
+
 				return true;
 			}
 		);
@@ -1847,17 +2070,20 @@ ContractionHierarchy CustomizableContractionHierarchyMetric::build_contraction_h
 				(void)mid_node;
 				(void)top_node;
 
-				assert(forward[top_arc] <= forward[bottom_arc] + forward[mid_arc]);
-				// assert(forward[top_arc] <= backward[bottom_arc] + forward[mid_arc]);
-				// assert(backward[top_arc] <= forward[bottom_arc] + backward[mid_arc]);
+				#ifdef UNDIRECTED
+				assert(weight[top_arc] <= weight[bottom_arc] + weight[mid_arc]);
+				assert(weight[bottom_arc] <= weight[mid_arc] + weight[top_arc]);
+				assert(weight[mid_arc] <= weight[bottom_arc] + weight[top_arc]);
+				#else
+				assert(forward[top_arc] <= backward[bottom_arc] + forward[mid_arc]);
+				assert(backward[top_arc] <= forward[bottom_arc] + backward[mid_arc]);
 
-				assert(forward[bottom_arc] <= forward[mid_arc] + forward[top_arc]);
-				// assert(forward[bottom_arc] <= forward[mid_arc] + backward[top_arc]);
-				// assert(backward[bottom_arc] <= backward[mid_arc] + forward[top_arc]);
+				assert(forward[bottom_arc] <= forward[mid_arc] + backward[top_arc]);
+				assert(backward[bottom_arc] <= backward[mid_arc] + forward[top_arc]);
 
-				assert(forward[mid_arc] <= forward[bottom_arc] + forward[top_arc]);
-				// assert(backward[mid_arc] <= backward[mid_arc]  + backward[top_arc]);
-
+                assert(forward[mid_arc] <= forward[mid_arc]  + forward[top_arc]);
+				assert(backward[mid_arc] <= backward[mid_arc]  + backward[top_arc]);
+				#endif
 				return true;
 			}
 		);
@@ -1869,21 +2095,29 @@ ContractionHierarchy CustomizableContractionHierarchyMetric::build_contraction_h
 	ch.order = cch->order;
 
 	LocalIDMapper forward_map(keep_forward_arc);
-	// LocalIDMapper backward_map(keep_backward_arc);
+	LocalIDMapper backward_map(keep_backward_arc);
 
 	ch.forward.head = keep_element_of_vector_if(keep_forward_arc, cch->up_head);
 	ch.forward.first_out = invert_vector(keep_element_of_vector_if(keep_forward_arc, cch->up_tail), cch->node_count());
+	#ifdef UNDIRECTED
+	ch.forward.weight = keep_element_of_vector_if(keep_forward_arc, weight);
+	#else
 	ch.forward.weight = keep_element_of_vector_if(keep_forward_arc, forward);
+	#endif
 	ch.forward.is_shortcut_an_original_arc = BitVector(ch.forward.head.size(), false);
 	ch.forward.shortcut_first_arc = std::vector<unsigned>(forward_map.local_id_count());
 	ch.forward.shortcut_second_arc = std::vector<unsigned>(forward_map.local_id_count());
 
-	// ch.backward.head = keep_element_of_vector_if(keep_backward_arc, cch->up_head);
-	// ch.backward.first_out = invert_vector(keep_element_of_vector_if(keep_backward_arc, cch->up_tail), cch->node_count());
-	// ch.backward.weight = keep_element_of_vector_if(keep_backward_arc, backward);
-	// ch.backward.is_shortcut_an_original_arc = BitVector(ch.backward.head.size(), false);
-	// ch.backward.shortcut_first_arc = std::vector<unsigned>(backward_map.local_id_count());
-	// ch.backward.shortcut_second_arc = std::vector<unsigned>(backward_map.local_id_count());
+	ch.backward.head = keep_element_of_vector_if(keep_backward_arc, cch->up_head);
+	ch.backward.first_out = invert_vector(keep_element_of_vector_if(keep_backward_arc, cch->up_tail), cch->node_count());
+	#ifdef UNDIRECTED
+	ch.backward.weight = keep_element_of_vector_if(keep_backward_arc, weight);
+	#else
+	ch.backward.weight = keep_element_of_vector_if(keep_backward_arc, backward);
+	#endif
+	ch.backward.is_shortcut_an_original_arc = BitVector(ch.backward.head.size(), false);
+	ch.backward.shortcut_first_arc = std::vector<unsigned>(backward_map.local_id_count());
+	ch.backward.shortcut_second_arc = std::vector<unsigned>(backward_map.local_id_count());
 
 	for(unsigned cch_arc=0; cch_arc<cch->cch_arc_count(); ++cch_arc){
 		if(keep_forward_arc.is_set(cch_arc)){
@@ -1904,19 +2138,35 @@ ContractionHierarchy CustomizableContractionHierarchyMetric::build_contraction_h
 						(void)mid_node;
 						(void)top_node;
 
-						// if(keep_backward_arc.is_set(bottom_arc) && keep_forward_arc.is_set(mid_arc)){
-						// 	if(backward[bottom_arc] + forward[mid_arc] == forward[top_arc]){
-						// 		ch.forward.shortcut_first_arc[forward_ch_arc] = backward_map.to_local(bottom_arc);
-						// 		ch.forward.shortcut_second_arc[forward_ch_arc] = forward_map.to_local(mid_arc);
-						// 		return false;
-						// 	}
-						// }
-						if(keep_forward_arc.is_set(mid_arc)){
-							if(forward[bottom_arc] + forward[mid_arc] == forward[top_arc]){
-								// ch.forward.shortcut_first_arc[forward_ch_arc] = backward_map.to_local(bottom_arc);
+						if(keep_backward_arc.is_set(bottom_arc) && keep_forward_arc.is_set(mid_arc)){
+							#ifdef UNDIRECTED
+							if(weight[bottom_arc] + weight[mid_arc] == weight[top_arc]){
+								ch.forward.shortcut_first_arc[forward_ch_arc] = backward_map.to_local(bottom_arc);
 								ch.forward.shortcut_second_arc[forward_ch_arc] = forward_map.to_local(mid_arc);
 								return false;
 							}
+							#else
+							if(backward[bottom_arc] + forward[mid_arc] == forward[top_arc]){
+								ch.forward.shortcut_first_arc[forward_ch_arc] = backward_map.to_local(bottom_arc);
+								ch.forward.shortcut_second_arc[forward_ch_arc] = forward_map.to_local(mid_arc);
+								return false;
+							}
+							#endif
+						}
+						if(keep_forward_arc.is_set(mid_arc)){
+							#ifdef UNDIRECTED
+							if(weight[bottom_arc] + weight[mid_arc] == weight[top_arc]){
+								ch.forward.shortcut_first_arc[forward_ch_arc] = backward_map.to_local(bottom_arc);
+								ch.forward.shortcut_second_arc[forward_ch_arc] = forward_map.to_local(mid_arc);
+								return false;
+							}
+							#else
+							if(forward[bottom_arc] + forward[mid_arc] == forward[top_arc]){
+								ch.forward.shortcut_first_arc[forward_ch_arc] = backward_map.to_local(bottom_arc);
+								ch.forward.shortcut_second_arc[forward_ch_arc] = forward_map.to_local(mid_arc);
+								return false;
+							}
+							#endif
 						}
 						return true;
 					}
@@ -1925,38 +2175,46 @@ ContractionHierarchy CustomizableContractionHierarchyMetric::build_contraction_h
 				assert(!was_forward_not_found);
 			}
 		}
-		// if(keep_backward_arc.is_set(cch_arc)){
-			// unsigned backward_ch_arc = backward_map.to_local(cch_arc);
-			// unsigned backward_original_arc = unpack_original_backward_arc(*cch, *this, cch_arc);
-			// if(backward_original_arc != invalid_id){
-			// 	ch.backward.is_shortcut_an_original_arc.set(backward_ch_arc);
-			// 	ch.backward.shortcut_first_arc[backward_ch_arc] = backward_original_arc;
-			// 	ch.backward.shortcut_second_arc[backward_ch_arc] = cch->order[cch->up_tail[cch_arc]];
-			// }else{
-			// 	bool was_backward_not_found = forall_lower_triangles_of_arc(
-			// 		*cch, cch_arc,
-			// 		[&](
-			// 			unsigned bottom_arc, unsigned mid_arc, unsigned top_arc,
-			// 			unsigned bottom_node, unsigned mid_node, unsigned top_node
-			// 		){
-			// 			(void)bottom_node;
-			// 			(void)mid_node;
-			// 			(void)top_node;
+		if(keep_backward_arc.is_set(cch_arc)){
+			unsigned backward_ch_arc = backward_map.to_local(cch_arc);
+			unsigned backward_original_arc = unpack_original_backward_arc(*cch, *this, cch_arc);
+			if(backward_original_arc != invalid_id){
+				ch.backward.is_shortcut_an_original_arc.set(backward_ch_arc);
+				ch.backward.shortcut_first_arc[backward_ch_arc] = backward_original_arc;
+				ch.backward.shortcut_second_arc[backward_ch_arc] = cch->order[cch->up_tail[cch_arc]];
+			}else{
+				bool was_backward_not_found = forall_lower_triangles_of_arc(
+					*cch, cch_arc,
+					[&](
+						unsigned bottom_arc, unsigned mid_arc, unsigned top_arc,
+						unsigned bottom_node, unsigned mid_node, unsigned top_node
+					){
+						(void)bottom_node;
+						(void)mid_node;
+						(void)top_node;
 
-			// 			if(keep_backward_arc.is_set(mid_arc) && keep_forward_arc.is_set(bottom_arc)){
-			// 				if(backward[mid_arc] + forward[bottom_arc] == backward[top_arc]){
-			// 					ch.backward.shortcut_first_arc[backward_ch_arc] = backward_map.to_local(mid_arc);
-			// 					ch.backward.shortcut_second_arc[backward_ch_arc] = forward_map.to_local(bottom_arc);
-			// 					return false;
-			// 				}
-			// 			}
-			// 			return true;
-			// 		}
-			// 	);
-			// 	(void) was_backward_not_found;
-			// 	assert(!was_backward_not_found);
-			// }
-		// }
+						if(keep_backward_arc.is_set(mid_arc) && keep_forward_arc.is_set(bottom_arc)){
+							#ifdef UNDIRECTED
+							if(weight[mid_arc] + weight[bottom_arc] == weight[top_arc]){
+								ch.backward.shortcut_first_arc[backward_ch_arc] = backward_map.to_local(mid_arc);
+								ch.backward.shortcut_second_arc[backward_ch_arc] = forward_map.to_local(bottom_arc);
+								return false;
+							}
+							#else
+							if(backward[mid_arc] + forward[bottom_arc] == backward[top_arc]){
+								ch.backward.shortcut_first_arc[backward_ch_arc] = backward_map.to_local(mid_arc);
+								ch.backward.shortcut_second_arc[backward_ch_arc] = forward_map.to_local(bottom_arc);
+								return false;
+							}
+							#endif
+						}
+						return true;
+					}
+				);
+				(void) was_backward_not_found;
+				assert(!was_backward_not_found);
+			}
+		}
 	}
 
 	check_contraction_hierarchy_for_errors(ch);

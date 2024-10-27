@@ -1,5 +1,6 @@
 #ifndef ROUTING_KIT_CUSTOMIZABLE_CONSTRACTION_HIERARCHY_H
 #define ROUTING_KIT_CUSTOMIZABLE_CONSTRACTION_HIERARCHY_H
+#define UNDIRECTED
 
 #include <routingkit/constants.h>
 #include <routingkit/id_set_queue.h>
@@ -51,17 +52,29 @@ struct CustomizableContractionHierarchy{
 	BitVector does_cch_arc_have_input_arc;
 	LocalIDMapper does_cch_arc_have_input_arc_mapper;
 
+	#ifdef UNDIRECTED
+	std::vector<unsigned>input_arc_of_cch;
+	#else
 	std::vector<unsigned>forward_input_arc_of_cch;
-	// std::vector<unsigned>backward_input_arc_of_cch;
-
+	std::vector<unsigned>backward_input_arc_of_cch;
+	#endif
+	
 	BitVector does_cch_arc_have_extra_input_arc;
 	LocalIDMapper does_cch_arc_have_extra_input_arc_mapper;
 
+	#ifdef UNDIRECTED
+    std::vector<unsigned>first_extra_input_arc_of_cch;
+	#else
 	std::vector<unsigned>first_extra_forward_input_arc_of_cch;
-	// std::vector<unsigned>first_extra_backward_input_arc_of_cch;
-	
+	std::vector<unsigned>first_extra_backward_input_arc_of_cch;
+	#endif
+
+	#ifdef UNDIRECTED
+	std::vector<unsigned>extra_input_arc_of_cch;
+	#else
 	std::vector<unsigned>extra_forward_input_arc_of_cch;
-	// std::vector<unsigned>extra_backward_input_arc_of_cch;
+	std::vector<unsigned>extra_backward_input_arc_of_cch;
+	#endif
 };
 
 struct CustomizableContractionHierarchyMetric{
@@ -80,8 +93,12 @@ struct CustomizableContractionHierarchyMetric{
 	ContractionHierarchy build_contraction_hierarchy_using_perfect_witness_search();
 
 // private:
+	#ifdef UNDIRECTED
+	std::vector<unsigned>weight;
+	#else
 	std::vector<unsigned>forward;
-	// std::vector<unsigned>backward;
+	std::vector<unsigned>backward;
+	#endif
 	const CustomizableContractionHierarchy*cch;
 	const unsigned*input_weight;
 
